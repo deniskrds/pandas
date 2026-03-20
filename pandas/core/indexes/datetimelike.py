@@ -384,9 +384,8 @@ class DatetimeIndexOpsMixin(NDArrayBackedExtensionIndex, ABC):
             self._get_values_for_csv(na_rep=na_rep, date_format=date_format)
         )
 
-    @property
-    def _formatter_func(self):
-        return self._data._formatter()
+    def _formatter_func(self, val) -> str:
+        return self._data._formatter()(val)
 
     def _format_attrs(self):
         """
@@ -456,7 +455,7 @@ class DatetimeIndexOpsMixin(NDArrayBackedExtensionIndex, ABC):
         reso = Resolution.from_attrname(reso_str)
         return parsed, reso
 
-    def _get_string_slice(self, key: str) -> slice | npt.NDArray[np.intp]:
+    def _get_string_slice(self, key: str) -> slice | npt.NDArray[np.intp]:  # type: ignore[override]
         # overridden by TimedeltaIndex
         parsed, reso = self._parse_with_reso(key)
         try:
@@ -889,7 +888,7 @@ class DatetimeTimedeltaMixin(DatetimeIndexOpsMixin, ABC):
             result = self[:0]
         else:
             lslice = slice(*left.slice_locs(start, end))
-            result = left._values[lslice]
+            result = left._values[lslice]  # type: ignore[assignment]
 
         return result
 
@@ -993,7 +992,7 @@ class DatetimeTimedeltaMixin(DatetimeIndexOpsMixin, ABC):
             #  that result.freq == self.freq
             return result
         else:
-            return super()._union(other, sort)._with_freq("infer")
+            return super()._union(other, sort)._with_freq("infer")  # type: ignore[union-attr]
 
     # --------------------------------------------------------------------
     # Join Methods
