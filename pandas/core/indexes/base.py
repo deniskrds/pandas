@@ -2143,8 +2143,8 @@ class Index(IndexOpsMixin, PandasObject):
         verification must be done like in MultiIndex.
 
         """
-        is_level_na = isna(level)
-        is_name_na = isna(self.name)
+        is_level_na = cast(bool, isna(level))
+        is_name_na = cast(bool, isna(self.name))
         if is_level_na and is_name_na:
             if is_matching_na(level, self.name):
                 return
