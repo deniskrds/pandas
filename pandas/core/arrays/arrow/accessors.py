@@ -184,7 +184,11 @@ class ListAccessor(ArrowAccessor):
                         offsets = chunk.offsets.slice(0, len(chunk))
                         indices = pc.add(offsets, pc.add(chunk_lengths, key))
                     all_results.append(chunk.values.take(indices))
-                element = pa.concat_arrays(all_results) if all_results else pa.array([], type=arr.type.value_type)
+                element = (
+                    pa.concat_arrays(all_results)
+                    if all_results
+                    else pa.array([], type=arr.type.value_type)
+                )
             else:
                 try:
                     element = pc.list_element(self._pa_array, key)
