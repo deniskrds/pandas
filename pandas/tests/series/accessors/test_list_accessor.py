@@ -161,6 +161,20 @@ def test_list_getitem_negative_index(list_dtype):
     with pytest.raises(IndexError, match="list index -4 out of bounds"):
         ser.list[-4]
 
+    # null list entries produce null in output
+    ser_mixed = Series(
+        [[1, 2, 3], None, [4, 5, 6]], dtype=ArrowDtype(list_dtype), name="a"
+    )
+    actual = ser_mixed.list[-1]
+    expected = Series([3, None, 6], dtype="int64[pyarrow]", name="a")
+    tm.assert_series_equal(actual, expected)
+
+    # all-None Series: consistent with positive key behaviour (returns all-null)
+    ser_all_null = Series([None, None], dtype=ArrowDtype(list_dtype), name="a")
+    actual = ser_all_null.list[-1]
+    expected = Series([None, None], dtype="int64[pyarrow]", name="a")
+    tm.assert_series_equal(actual, expected)
+
 
 def test_list_accessor_not_iterable():
     ser = Series(

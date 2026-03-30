@@ -165,7 +165,7 @@ class ListAccessor(ArrowAccessor):
             if key < 0:
                 arr = self._pa_array
                 min_length = pc.min(pc.list_value_length(arr)).as_py()
-                if min_length is None or min_length < abs(key):
+                if min_length is not None and min_length < abs(key):
                     raise IndexError(f"list index {key} out of bounds")
                 chunks = arr.chunks if isinstance(arr, pa.ChunkedArray) else [arr]
                 all_results = []
