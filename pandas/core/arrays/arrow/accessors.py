@@ -192,8 +192,8 @@ class ListAccessor(ArrowAccessor):
             else:
                 try:
                     element = pc.list_element(self._pa_array, key)
-                except pa.lib.ArrowInvalid:
-                    raise IndexError(f"list index {key} out of bounds")
+                except pa.lib.ArrowInvalid as err:
+                    raise IndexError(f"list index {key} out of bounds") from err
             return Series(
                 element,
                 dtype=ArrowDtype(element.type),
