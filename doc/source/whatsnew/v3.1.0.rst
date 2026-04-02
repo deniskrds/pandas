@@ -298,6 +298,7 @@ Styler
 
 Other
 ^^^^^
+- Bug in :meth:`DataFrame.eval` where a string literal on the left side of the ``in`` or ``not in`` operator (e.g. ``"foo" in value``) incorrectly returned a :class:`Series` of all ``False`` instead of a scalar boolean (:issue:`64391`)
 
 .. ***DO NOT USE THIS SECTION***
 

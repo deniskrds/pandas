@@ -1298,6 +1298,19 @@ class TestOperations:
         expected = Series([True], name="a")
         tm.assert_series_equal(result, expected)
 
+    def test_string_literal_in_column(self, engine):
+        # GH#64391
+        df = DataFrame({"value": ["foobar", "foobaz", "bar", "baz"]})
+        assert df.eval('"foo" in value', engine=engine, parser="pandas") == False
+        assert df.eval('"foo" not in value', engine=engine, parser="pandas") == True
+
+        df_str_idx = DataFrame({"value": ["foobar", "foobaz"]}, index=["foo", "bar"])
+        assert df_str_idx.eval('"foo" in value', engine=engine, parser="pandas") == True
+        assert (
+            df_str_idx.eval('"foo" not in value', engine=engine, parser="pandas")
+            == False
+        )
+
     def test_assignment_not_inplace(self):
         # see gh-9297
         df = DataFrame(
