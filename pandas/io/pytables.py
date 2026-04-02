@@ -41,13 +41,17 @@ from pandas._libs import (
 )
 from pandas._libs.lib import is_string_array
 from pandas._libs.tslibs import timezones
-from pandas.compat import HAS_PYARROW
+from pandas.compat import (
+    HAS_PYARROW,
+    PY312,
+)
 from pandas.compat._optional import import_optional_dependency
 from pandas.compat.pickle_compat import patch_pickle
 from pandas.errors import (
     AttributeConflictWarning,
     ClosedFileError,
     IncompatibilityWarning,
+    Pandas4Warning,
     PerformanceWarning,
     PossibleDataLossError,
 )
@@ -181,8 +185,14 @@ def _ensure_term(where, scope_level: int):
     # list
     level = scope_level + 1
     if isinstance(where, (list, tuple)):
+        # Pre-3.12 the list comprehension created its own stack frame,
+        # requiring an extra +1 to reach the caller's scope. PEP 709
+        # inlined comprehensions in 3.12, removing that frame.
+        comp_adjustment = 0 if PY312 else 1
         where = [
-            Term(term, scope_level=level + 1) if maybe_expression(term) else term
+            Term(term, scope_level=level + comp_adjustment)
+            if maybe_expression(term)
+            else term
             for term in where
             if term is not None
         ]
@@ -233,6 +243,13 @@ with config.config_prefix("io.hdf"):
         validator=config.is_one_of_factory(["fixed", "table", None]),
     )
 
+config.deprecate_option(
+    "io.hdf.dropna_table",
+    Pandas4Warning,
+    msg="io.hdf.dropna_table option is deprecated. Use DataFrame.dropna "
+    "before writing instead.",
+)
+
 # oh the troubles to reduce import time
 _table_mod: ModuleType | None = None
 _table_file_open_policy_is_strict = False
@@ -272,7 +289,7 @@ def to_hdf(
     index: bool = True,
     min_itemsize: int | dict[str, int] | None = None,
     nan_rep=None,
-    dropna: bool | None = None,
+    dropna: bool | None | lib.NoDefault = lib.no_default,
     data_columns: Literal[True] | list[str] | None = None,
     errors: str = "strict",
     encoding: str = "UTF-8",
@@ -1150,7 +1167,7 @@ class HDFStore:
         encoding=None,
         errors: str = "strict",
         track_times: bool = True,
-        dropna: bool = False,
+        dropna: bool | lib.NoDefault = lib.no_default,
     ) -> None:
         """
         Store object in HDFStore.
@@ -1212,6 +1229,11 @@ class HDFStore:
         dropna : bool, default False, optional
             Remove missing values.
 
+            .. deprecated:: 3.1.0
+                The ``dropna`` keyword is deprecated and will be removed in a
+                future version. Use :meth:`DataFrame.dropna` before writing
+                instead.
+
         See Also
         --------
         HDFStore.info : Prints detailed information on the store.
@@ -1223,6 +1245,16 @@ class HDFStore:
         >>> store = pd.HDFStore("store.h5", "w")  # doctest: +SKIP
         >>> store.put("data", df)  # doctest: +SKIP
         """
+        if dropna is not lib.no_default:
+            warnings.warn(
+                "The 'dropna' keyword in HDFStore.put is deprecated and "
+                "will be removed in a future version. Use DataFrame.dropna "
+                "before writing instead.",
+                Pandas4Warning,
+                stacklevel=find_stack_level(),
+            )
+        else:
+            dropna = False
         if format is None:
             format = _global_config["io"]["hdf"]["default_format"] or "fixed"
         format = self._validate_format(format)
@@ -1313,7 +1345,7 @@ class HDFStore:
         nan_rep=None,
         chunksize: int | None = None,
         expectedrows=None,
-        dropna: bool | None = None,
+        dropna: bool | None | lib.NoDefault = lib.no_default,
         data_columns: Literal[True] | list[str] | None = None,
         encoding=None,
         errors: str = "strict",
@@ -1364,6 +1396,12 @@ class HDFStore:
         dropna : bool, default False, optional
             Do not write an ALL nan row to the store settable
             by the option 'io.hdf.dropna_table'.
+
+            .. deprecated:: 3.1.0
+                The ``dropna`` keyword is deprecated and will be removed in a
+                future version. Use :meth:`DataFrame.dropna` before writing
+                instead.
+
         data_columns : list of columns, or True, default None
             List of columns to create as indexed data columns for on-disk
             queries, or True to use all columns. By default only the axes
@@ -1406,8 +1444,17 @@ class HDFStore:
                 "columns is not a supported keyword in append, try data_columns"
             )
 
-        if dropna is None:
-            dropna = _global_config["io"]["hdf"]["dropna_table"]
+        if dropna is not lib.no_default:
+            warnings.warn(
+                "The 'dropna' keyword in HDFStore.append is deprecated and "
+                "will be removed in a future version. Use DataFrame.dropna "
+                "before writing instead.",
+                Pandas4Warning,
+                stacklevel=find_stack_level(),
+            )
+            dropna = bool(dropna) if dropna is not None else False
+        else:
+            dropna = False
         if format is None:
             format = _global_config["io"]["hdf"]["default_format"] or "table"
         format = self._validate_format(format)
@@ -1437,7 +1484,7 @@ class HDFStore:
         selector,
         data_columns=None,
         axes=None,
-        dropna: bool = False,
+        dropna: bool | lib.NoDefault = lib.no_default,
         **kwargs,
     ) -> None:
         """
@@ -1455,6 +1502,11 @@ class HDFStore:
             use all columns
         dropna : if evaluates to True, drop rows from all tables if any single
                  row in each table has all NaN. Default False.
+
+            .. deprecated:: 3.1.0
+                The ``dropna`` keyword is deprecated and will be removed in a
+                future version. Use :meth:`DataFrame.dropna` before writing
+                instead.
 
         Notes
         -----
@@ -1504,6 +1556,16 @@ class HDFStore:
             data_columns = d[selector]
 
         # ensure rows are synchronized across the tables
+        if dropna is not lib.no_default:
+            warnings.warn(
+                "The 'dropna' keyword in HDFStore.append_to_multiple is "
+                "deprecated and will be removed in a future version. Use "
+                "DataFrame.dropna before writing instead.",
+                Pandas4Warning,
+                stacklevel=find_stack_level(),
+            )
+        else:
+            dropna = False
         if dropna:
             idxs = (value[cols].dropna(how="all").index for cols in d.values())
             valid_index = next(idxs)

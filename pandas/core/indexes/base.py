@@ -2811,7 +2811,7 @@ class Index(IndexOpsMixin, PandasObject):
         >>> idx.fillna(0)
         Index([0.0, 0.0, 3.0], dtype='float64')
         """
-        if not is_scalar(value):
+        if is_list_like(value, allow_sets=False) and not isinstance(value, tuple):
             raise TypeError(f"'value' must be a scalar, passed: {type(value).__name__}")
 
         if self.hasnans:
@@ -3902,6 +3902,13 @@ class Index(IndexOpsMixin, PandasObject):
                 tgt_values = target._get_engine_target()
 
             indexer = self._engine.get_indexer(tgt_values)  # pyright: ignore[reportArgumentType]
+
+        if method is not None and target._can_hold_na and not target._is_multi:
+            # GH#32572 NaT/NaN in the target should not be matched
+            #  by pad/backfill/nearest
+            na_mask = target._isnan
+            if na_mask.any():
+                indexer[na_mask] = -1
 
         return ensure_platform_int(indexer)
 
@@ -5085,6 +5092,12 @@ class Index(IndexOpsMixin, PandasObject):
         #  not zero-copy.
         # TODO: exclude RangeIndex (which allocates memory)?
         #  Doing so seems to break test_concat_datetime_timezone
+        if isinstance(self, ABCCategoricalIndex) and not self.ordered:
+            # For unordered CategoricalIndex, dtype equality does not
+            # guarantee matching category order across indexes. Since libjoin
+            # operates on codes, mismatched category order leads to incorrect
+            # results. GH#55335
+            return False
         return not isinstance(self, (ABCIntervalIndex, ABCMultiIndex))
 
     # --------------------------------------------------------------------
@@ -5708,6 +5721,12 @@ class Index(IndexOpsMixin, PandasObject):
 
         if isinstance(values, np.ndarray):
             converted = setitem_datetimelike_compat(values, mask.sum(), converted)
+            if isinstance(converted, tuple):
+                # GH#37681 np.putmask unpacks tuples, so wrap in an
+                #  object array to ensure the tuple is treated as a scalar
+                fill_arr = np.empty(1, dtype=object)
+                fill_arr[0] = converted
+                converted = fill_arr
             np.putmask(values, mask, converted)  # pyright: ignore[reportArgumentType]
 
         else:
